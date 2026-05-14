@@ -138,3 +138,4 @@ D:\dotnet\CourseManagement.Api\obj\Debug\net8.0\refint\CourseManagement.Api.dll
 D:\dotnet\CourseManagement.Api\obj\Debug\net8.0\CourseManagement.Api.pdb
 D:\dotnet\CourseManagement.Api\obj\Debug\net8.0\CourseManagement.Api.genruntimeconfig.cache
 D:\dotnet\CourseManagement.Api\obj\Debug\net8.0\ref\CourseManagement.Api.dll
+D:\dotnet\CourseManagement.Api\obj\Debug\net8.0\CourseManagement.Api.sourcelink.json

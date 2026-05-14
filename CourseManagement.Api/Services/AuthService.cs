@@ -13,7 +13,7 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
   private readonly IUserRepository _userRepository = userRepository;
   private readonly IConfiguration _configuration = configuration;
 
-  public async Task<(bool Success, string Error, AuthResponseDto? Response)> RegisterAsync(RegisterDto dto)
+  public async Task<(bool Success, string Error, AuthTokensDto? Response)> RegisterAsync(RegisterDto dto)
   {
     if (dto.Role == UserRole.Admin)
     {
@@ -41,7 +41,7 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
     return (true, string.Empty, BuildAuthResponse(user));
   }
 
-  public async Task<(bool Success, string Error, AuthResponseDto? Response)> LoginAsync(LoginDto dto)
+  public async Task<(bool Success, string Error, AuthTokensDto? Response)> LoginAsync(LoginDto dto)
   {
     var email = dto.Email.Trim().ToLowerInvariant();
     var user = await _userRepository.GetByEmailAsync(email);
@@ -53,33 +53,47 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
     return (true, string.Empty, BuildAuthResponse(user));
   }
 
-  private AuthResponseDto BuildAuthResponse(User user)
+  private AuthTokensDto BuildAuthResponse(User user)
   {
     var tokenHandler = new JwtSecurityTokenHandler();
     var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!);
 
-    var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.FullName),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.Role.ToString())
-        };
-
-    var tokenDescriptor = new SecurityTokenDescriptor
+    var baseClaims = new List<Claim>
     {
-      Subject = new ClaimsIdentity(claims),
-      Expires = DateTime.UtcNow.AddHours(8),
+      new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+      new(ClaimTypes.Name, user.FullName),
+      new(ClaimTypes.Email, user.Email),
+      new(ClaimTypes.Role, user.Role.ToString())
+    };
+
+    var accessClaims = new List<Claim>(baseClaims) { new("typ", "access") };
+    var refreshClaims = new List<Claim>(baseClaims) { new("typ", "refresh") };
+
+    var accessTokenDescriptor = new SecurityTokenDescriptor
+    {
+      Subject = new ClaimsIdentity(accessClaims),
+      Expires = DateTime.UtcNow.AddMinutes(30),
       Issuer = _configuration["Jwt:Issuer"],
       Audience = _configuration["Jwt:Audience"],
       SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
     };
 
-    var token = tokenHandler.CreateToken(tokenDescriptor);
-
-    return new AuthResponseDto
+    var refreshTokenDescriptor = new SecurityTokenDescriptor
     {
-      Token = tokenHandler.WriteToken(token),
+      Subject = new ClaimsIdentity(refreshClaims),
+      Expires = DateTime.UtcNow.AddDays(14),
+      Issuer = _configuration["Jwt:Issuer"],
+      Audience = _configuration["Jwt:Audience"],
+      SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+    };
+
+    var accessToken = tokenHandler.CreateToken(accessTokenDescriptor);
+    var refreshToken = tokenHandler.CreateToken(refreshTokenDescriptor);
+
+    return new AuthTokensDto
+    {
+      AccessToken = tokenHandler.WriteToken(accessToken),
+      RefreshToken = tokenHandler.WriteToken(refreshToken),
       UserId = user.Id,
       FullName = user.FullName,
       Email = user.Email,
